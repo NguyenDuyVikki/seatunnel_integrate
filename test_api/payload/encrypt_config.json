@@ -1,0 +1,35 @@
+{
+    "env": {
+        "parallelism": 1,
+        "shade.identifier":"base64"
+    },
+    "source": [
+        {
+            "plugin_name": "MySQL-CDC",
+            "schema" : {
+                "fields": {
+                    "name": "string",
+                    "age": "int"
+                }
+            },
+            "plugin_output": "fake",
+            "parallelism": 1,
+            "hostname": "127.0.0.1",
+            "username": "seatunnel",
+            "password": "seatunnel_password",
+            "table-name": "inventory_vwyw0n"
+        }
+    ],
+    "transform": [
+    ],
+    "sink": [
+        {
+            "plugin_name": "Clickhouse",
+            "host": "localhost:8123",
+            "database": "default",
+            "table": "fake_all",
+            "username": "seatunnel",
+            "password": "seatunnel_password"
+        }
+    ]
+}
