@@ -1,0 +1,8 @@
+
+seatunnel:
+  engine:
+    http:
+      enable-http: true
+      port: 8080
+      enable-dynamic-port: true
+      port-range: 100
