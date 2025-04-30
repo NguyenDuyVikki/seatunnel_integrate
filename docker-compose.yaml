@@ -1,0 +1,155 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: vikki
+      POSTGRES_PASSWORD: vikki123
+      POSTGRES_DB: vikki_datalake
+      # PostgreSQL configuration parameters
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+      # Enable WAL and set to logical level
+      POSTGRES_INITDB_WALDIR: "/var/lib/postgresql/wal"
+    command: 
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c" 
+      - "max_wal_senders=8"
+      - "-c"
+      - "max_replication_slots=4"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_wal:/var/lib/postgresql/wal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vikki"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sftp:
+    image: lscr.io/linuxserver/openssh-server:latest
+    ports:
+      - "2222:2222"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - USER_NAME=vikki
+      - USER_PASSWORD=vikki123
+      - PASSWORD_ACCESS=true
+      - SUDO_ACCESS=false
+    volumes:
+      - sftp_data:/home/vikki/upload
+
+  kafka:
+    image: bitnami/kafka:latest
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    volumes:
+      - kafka_data:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # unified-api-server:
+  #   build:
+  #     context: ./unified-api-server
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NODE_ENV=development
+  #     - POSTGRES_HOST=postgres
+  #     - POSTGRES_PORT=5432
+  #     - POSTGRES_USER=vikki
+  #     - POSTGRES_PASSWORD=vikki123
+  #     - POSTGRES_DB=vikki_datalake
+  #     - KAFKA_BROKERS=kafka:9092
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     kafka:
+  #       condition: service_healthy
+
+  master:
+    image: apache/seatunnel:2.3.10
+    container_name: seatunnel_master
+    environment:
+      - ST_DOCKER_MEMBER_LIST=172.16.0.2,172.16.0.3,172.16.0.4
+      - HZ_NETWORK_RESTAPI_ENABLED=true
+    # volumes:
+    #   - ./seatunnel/config/hazelcast-master.yaml:/opt/seatunnel/config/hazelcast-master.yaml
+    entrypoint: >
+      /bin/sh -c "
+      /opt/seatunnel/bin/seatunnel-cluster.sh -r master
+      "    
+    ports:
+      - "5801:5801"  
+      - "8080:8080"
+    networks:
+      seatunnel_network:
+        ipv4_address: 172.16.0.2
+
+  worker1:
+    image: apache/seatunnel:2.3.10
+    container_name: seatunnel_worker_1
+    environment:
+      - ST_DOCKER_MEMBER_LIST=172.16.0.2,172.16.0.3,172.16.0.4
+      - HZ_NETWORK_RESTAPI_ENABLED=true
+    # volumes:
+    #   - ./seatunnel/config/hazelcast-worker.yaml:/opt/seatunnel/config/hazelcast-worker.yaml
+    entrypoint: >
+      /bin/sh -c "
+      /opt/seatunnel/bin/seatunnel-cluster.sh -r worker
+      " 
+    depends_on:
+      - master
+    networks:
+      seatunnel_network:
+        ipv4_address: 172.16.0.3
+
+  worker2:
+    image: apache/seatunnel:2.3.10
+    container_name: seatunnel_worker_2
+    environment:
+      - ST_DOCKER_MEMBER_LIST=172.16.0.2,172.16.0.3,172.16.0.4
+      - HZ_NETWORK_RESTAPI_ENABLED=true
+    # volumes:
+    #   - ./seatunnel/config/hazelcast-worker.yaml:/opt/seatunnel/config/hazelcast-worker.yaml
+    entrypoint: >
+      /bin/sh -c "
+      /opt/seatunnel/bin/seatunnel-cluster.sh -r worker
+      " 
+    depends_on:
+      - master
+    networks:
+      seatunnel_network:
+        ipv4_address: 172.16.0.4
+
+networks:
+  seatunnel_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.0.0/24
+
+
+volumes:
+  postgres_data:
+  postgres_wal:
+  sftp_data:
+  kafka_data:
