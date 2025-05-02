@@ -1,30 +1,37 @@
 version: '3.8'
-
 services:
   master:
-    image: apache/seatunnel
+    image: apache/seatunnel:2.3.10
     container_name: seatunnel_master
     environment:
-      - ST_DOCKER_MEMBER_LIST=172.16.0.2,172.16.0.3,172.16.0.4    
+      - ST_DOCKER_MEMBER_LIST=master:5801,worker1:5801,worker2:5801
+      - AWS_REGION=ap-southeast-1
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
     entrypoint: >
       /bin/sh -c "
       /opt/seatunnel/bin/seatunnel-cluster.sh -r master
-      "    
+      "
     ports:
-      - "5801:5801"  
+      - "5801:5801"
     networks:
       seatunnel_network:
         ipv4_address: 172.16.0.2
 
   worker1:
-    image: apache/seatunnel
+    image: apache/seatunnel:2.3.10
     container_name: seatunnel_worker_1
     environment:
-      - ST_DOCKER_MEMBER_LIST=172.16.0.2,172.16.0.3,172.16.0.4
+      - ST_DOCKER_MEMBER_LIST=master:5801,worker1:5801,worker2:5801
+      - AWS_REGION=ap-southeast-1
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
     entrypoint: >
       /bin/sh -c "
       /opt/seatunnel/bin/seatunnel-cluster.sh -r worker
-      " 
+      "
     depends_on:
       - master
     networks:
@@ -32,14 +39,18 @@ services:
         ipv4_address: 172.16.0.3
 
   worker2:
-    image: apache/seatunnel
+    image: apache/seatunnel:2.3.10
     container_name: seatunnel_worker_2
     environment:
-      - ST_DOCKER_MEMBER_LIST=172.16.0.2,172.16.0.3,172.16.0.4
+      - ST_DOCKER_MEMBER_LIST=master:5801,worker1:5801,worker2:5801
+      - AWS_REGION=ap-southeast-1
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
     entrypoint: >
       /bin/sh -c "
       /opt/seatunnel/bin/seatunnel-cluster.sh -r worker
-      " 
+      "
     depends_on:
       - master
     networks:

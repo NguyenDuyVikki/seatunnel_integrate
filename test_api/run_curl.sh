@@ -29,23 +29,16 @@ curl -X POST "$API_URL" \
             "plugin_input_table": "raw_data",
             "catalog_name": "glue_catalog",
             "catalog_type": "glue",
-            "namespace": "seatunnel",
-            "table": "test",
+            "namespace": "demo_glue_duy",
+            "create_table_if_not_exists": "true",
+            "table": "seatunnel",
             "iceberg.catalog.config": {
-              "warehouse": "s3://seatunnel/test/",
+              "warehouse": "s3://demo-seatunnel/",
               "catalog-impl": "org.apache.iceberg.aws.glue.GlueCatalog",
               "io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
               "client.region": "ap-southeast-1"
-            },
+            }
           }
         ]
       }
     '
-
-
-# curl -X POST "$API_URL" \
-#     -H "Content-Type: application/json" \
-#     -d @stop_job.json
-
-
-# curl --location 'http://172.16.0.2:8080/submit-job/upload' --form 'config_file=@"/temp/fake_to_console.conf"'
