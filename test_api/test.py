@@ -1,0 +1,3 @@
+import json
+json_test = {'env': {'job.mode': 'BATCH', 'parallelism': 1}, 'source': [{'plugin_name': 'FakeSource', 'plugin_output_table': 'raw_data', 'row_num': None, 'schema': {'fields': {'name': 'string', 'age': 'int'}}}], 'sink': [{'plugin_name': 'Iceberg', 'plugin_input_table': 'raw_data', 'catalog_name': 'glue_catalog', 'catalog_type': 'glue', 'namespace': 'demo_glue_duy', 'table': 'seatunnel', 'create_table_if_not_exists': 'true', 'iceberg.catalog.config': {'warehouse': 's3://demo-seatunnel/', 'catalog-impl': 'org.apache.iceberg.aws.glue.GlueCatalog', 'io-impl': 'org.apache.iceberg.aws.s3.S3FileIO', 'client.region': 'ap-southeast-1'}}]}
+print(json.dumps(json_test, indent=4))

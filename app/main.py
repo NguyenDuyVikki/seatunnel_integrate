@@ -1,37 +1,64 @@
-import sentry_sdk
+# app/main.py
+
 from fastapi import FastAPI
-from fastapi.routing import APIRoute
-from starlette.middleware.cors import CORSMiddleware
-
-from app.api.main import api_router
-from app.core.config import settings
-
-
-def custom_generate_unique_id(route: APIRoute) -> str:
-    return f"{route.tags[0]}-{route.name}"
-
-
-if settings.SENTRY_DSN and settings.ENVIRONMENT != "local":
-    sentry_sdk.init(dsn=str(settings.SENTRY_DSN), enable_tracing=True)
-
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+from app.api.v1.router import api_router
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description="API documentation for controlling SeaTunnel jobs",
+    title="SeaTunnel Job API",
+    description="API for creating and managing SeaTunnel jobs",
     version="1.0.0",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url="/docs",           
-    redoc_url="/redoc",          
-    generate_unique_id_function=custom_generate_unique_id,
+    docs_url="/swagger",
+    openapi_url="/openapi.json",
+    redoc_url=None,
 )
 
-# Set all CORS enabled origins
-if settings.all_cors_origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.all_cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Consider specifying allowed origins in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(api_router, prefix="/api/v1")
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title="SeaTunnel Job API",
+        version="1.0.0",
+        description="API for creating and managing SeaTunnel jobs",
+        routes=app.routes,
     )
+    
+    # Add custom logo to OpenAPI schema
+    openapi_schema["info"]["x-logo"] = {
+        "url": "https://your.cdn/logo.png",
+        "backgroundColor": "#FFFFFF",
+        "altText": "SeaTunnel Logo"
+    }
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
 
-app.include_router(api_router, prefix=settings.API_V1_STR)
+# Override default OpenAPI schema
+app.openapi = custom_openapi
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to SeaTunnel Job API"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",  # Corrected module reference
+        host="0.0.0.0",
+        port=8000,
+        reload=True,  # Note: reload=True should be used only in development
+    )

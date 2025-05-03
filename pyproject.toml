@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "seatunnel-demo"
+version = "0.1.0"
+description = "no description"
+authors = ["Duy Nguyen <duy.nguyen2@vikki.vn>"] 
+readme = "README.md"
+license = "MIT"
+packages = [{include = "app"}]  
+[tool.poetry.dependencies]
+python = ">=3.12"
+fastapi = "0.111.0"
+uvicorn = "0.29.0"
+sentry-sdk = "2.0.1"
+python-dotenv = "1.0.1"
+pydantic = "2.7.1"
+starlette = "0.37.2"
+
+[tool.poetry.group.dev.dependencies]  # Fixed: Changed from dev-dependencies
+pytest = "^7.0.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
