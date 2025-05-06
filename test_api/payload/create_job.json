@@ -1,37 +1,55 @@
-
-      {
-        "env": {
-          "job.mode": "BATCH",
-          "parallelism": 1
-        },
-        "source": [
+{
+  "env": {
+    "job.mode": "BATCH",
+    "parallelism": 1,
+    "spark.log.level": "DEBUG"
+  },
+  "source": [
+    {
+      "plugin_name": "FakeSource",
+      "result_table_name": "raw_data",
+      "row.num": 100,
+      "schema": {
+        "fields": [
           {
-            "plugin_name": "FakeSource",
-            "plugin_output_table": "raw_data",
-            "row.num": 10,
-            "schema": {
-              "fields": {
-                "name": "string",
-                "age": "int"
-              }
-            }
-          }
-        ],
-        "sink": [
+            "field": "name",
+            "type": "string"
+          },
           {
-            "plugin_name": "Iceberg",
-            "plugin_input_table": "raw_data",
-            "catalog_name": "glue_catalog",
-            "catalog_type": "glue",
-            "namespace": "seatunnel",
-            "table": "test",
-            "iceberg.catalog.config": {
-              "warehouse": "s3://seatunnel/test/",
-              "catalog-impl": "org.apache.iceberg.aws.glue.GlueCatalog",
-              "io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
-              "client.region": "ap-southeast-1"
-            }
+            "field": "age",
+            "type": "int"
           }
         ]
       }
-      
+    }
+  ],
+  "sink": [
+    {
+      "plugin_name": "Iceberg",
+      "source_table_name": "raw_data",
+      "catalog_name": "glue_catalog",
+      "catalog_type": "glue",
+      "namespace": "seatunnel",
+      "table": "test",
+      "create_table_if_not_exists": true,
+      "schema": {
+        "fields": [
+          {
+            "field": "name",
+            "type": "string"
+          },
+          {
+            "field": "age",
+            "type": "int"
+          }
+        ]
+      },
+      "iceberg.catalog.config": {
+        "warehouse": "s3://demo-seatunnel/",
+        "catalog-impl": "org.apache.iceberg.aws.glue.GlueCatalog",
+        "io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
+        "client.region": "ap-southeast-1"
+      }
+    }
+  ]
+}
