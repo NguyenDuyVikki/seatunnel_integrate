@@ -12,7 +12,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ALLOW_ANONYMOUS_LOGIN: yes
     networks:
-      - kafka-net
+      - seatunnel_network
 
   kafka:
     container_name: kafka
@@ -31,7 +31,7 @@ services:
     depends_on:
       - zookeeper
     networks:
-      - kafka-net
+      - seatunnel_network
 
   schema-registry:
     container_name: schema-registry
@@ -46,7 +46,7 @@ services:
       - zookeeper
       - kafka
     networks:
-      - kafka-net
+      - seatunnel_network
 
   kafka-ui:
     container_name: kafka-ui
@@ -64,7 +64,7 @@ services:
       - kafka
       - schema-registry
     networks:
-      - kafka-net
+      - seatunnel_network
 
   postgres:
     container_name: local-postgres
@@ -75,10 +75,18 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    command:
+      - postgres
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=5"
+      - "-c"
+      - "max_replication_slots=5"
     volumes:
       - ~/Documents/workspace/pg-data-v2:/var/lib/postgresql/data
     networks:
-      - kafka-net
+      - seatunnel_network
 
   redis:
     container_name: local-redis
@@ -87,8 +95,12 @@ services:
       - '6379:6379'
     restart: always
     networks:
-      - kafka-net
+      - seatunnel_network
 
 networks:
-  kafka-net:
+  seatunnel_network:
+    name: seatunnel_network
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.0.0/24

@@ -193,7 +193,6 @@ class MySQLConnector(DBConnector):
                 return columns
 
     def _map_type_to_seatunnel(self, mysql_type: str) -> str:
-        """Map MySQL types to SeaTunnel compatible types"""
         mysql_type = mysql_type.lower()
         type_mapping = {
             r"\bint\b": "int",
@@ -317,13 +316,11 @@ class ConnectorFactory:
         return connector_class(config)
 
 class SchemaManager:
-    """Manager for handling multiple database connectors and schema operations"""
     
     def __init__(self):
         self.connectors: Dict[str, DBConnector] = {}
         
     async def add_connector(self, name: str, connector: DBConnector) -> None:
-        """Add a database connector with a unique name"""
         self.connectors[name] = connector
         
     async def create_connector(
@@ -332,7 +329,6 @@ class SchemaManager:
         name: str, 
         config: DBConfig
     ) -> bool:
-        """Create and add a connector for a specific database type"""
         connector = ConnectorFactory.create_connector(db_type, config)
         if not connector:
             return False
@@ -343,7 +339,6 @@ class SchemaManager:
         return False
 
     async def get_tables(self, connector_name: str, database: Optional[str] = None, schema: Optional[str] = None) -> List[str]:
-        """Get list of tables from a specific database connector"""
         connector = self.connectors.get(connector_name)
         if not connector:
             logger.error(f"Connector '{connector_name}' not found")
@@ -373,7 +368,6 @@ class SchemaManager:
         database: Optional[str] = None, 
         schema: Optional[str] = None
     ) -> Dict[str, Dict[str, Any]]:
-        """Get schema for multiple tables at once"""
         tasks = [
             self.get_schema(connector_name, table, database, schema)
             for table in tables
@@ -385,19 +379,16 @@ class SchemaManager:
         }
 
     async def close_connector(self, connector_name: str) -> None:
-        """Close a specific database connector"""
         connector = self.connectors.get(connector_name)
         if connector:
             await connector.close()
             del self.connectors[connector_name]
 
     async def close_all_connectors(self) -> None:
-        """Close all database connectors"""
         tasks = [self.close_connector(name) for name in list(self.connectors.keys())]
         await asyncio.gather(*tasks)
 
 async def main():
-    """Example usage"""
     schema_manager = SchemaManager()
     
     # PostgreSQL configuration

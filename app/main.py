@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from app.api.v1.router import api_router
+
 app = FastAPI(
     title="SeaTunnel Job API",
     description="API for creating and managing SeaTunnel jobs",

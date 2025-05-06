@@ -4,7 +4,8 @@ services:
     image: apache/seatunnel:2.3.10
     container_name: seatunnel_master
     environment:
-      - ST_DOCKER_MEMBER_LIST=master:5801,worker1:5801,worker2:5801
+      - ST_DOCKER_MEMBER_LIST=172.16.0.2:5801,172.16.0.3:5801,172.16.0.4:5801
+      - HZ_NETWORK_PUBLICADDRESS=172.16.0.2
       - AWS_REGION=ap-southeast-1
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -15,6 +16,8 @@ services:
       "
     ports:
       - "5801:5801"
+      - "8080:8080"
+
     networks:
       seatunnel_network:
         ipv4_address: 172.16.0.2
@@ -23,7 +26,8 @@ services:
     image: apache/seatunnel:2.3.10
     container_name: seatunnel_worker_1
     environment:
-      - ST_DOCKER_MEMBER_LIST=master:5801,worker1:5801,worker2:5801
+      - ST_DOCKER_MEMBER_LIST=172.16.0.2:5801,172.16.0.3:5801,172.16.0.4:5801
+      - HZ_NETWORK_PUBLICADDRESS=172.16.0.3
       - AWS_REGION=ap-southeast-1
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -42,7 +46,8 @@ services:
     image: apache/seatunnel:2.3.10
     container_name: seatunnel_worker_2
     environment:
-      - ST_DOCKER_MEMBER_LIST=master:5801,worker1:5801,worker2:5801
+      - ST_DOCKER_MEMBER_LIST=172.16.0.2:5801,172.16.0.3:5801,172.16.0.4:5801
+      - HZ_NETWORK_PUBLICADDRESS=172.16.0.4
       - AWS_REGION=ap-southeast-1
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -59,6 +64,7 @@ services:
 
 networks:
   seatunnel_network:
+    name: seatunnel_network
     driver: bridge
     ipam:
       config:

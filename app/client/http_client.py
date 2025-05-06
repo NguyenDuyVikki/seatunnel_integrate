@@ -3,6 +3,7 @@ import requests
 from typing import Optional, Dict, Any
 from app.config.setting import settings  # import your SETTINGS instance
 import json
+
 class SeaTunnelClient:
     def __init__(
         self,

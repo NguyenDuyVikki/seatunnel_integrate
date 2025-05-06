@@ -3,6 +3,7 @@ from app.models.job import Job, JobResponse, JobConfig
 from typing import Dict, Any, Optional
 from app.utils.db_connector import SchemaManager, DBConfig, PostgreSQLConnector
 from typing import List
+
 class JobService:
     def __init__(self, client: SeaTunnelClient):
         self.client = client
