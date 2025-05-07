@@ -26,24 +26,18 @@ Open Swagger UI at http://localhost:8000/swagger
 ```json
 {
   "source": {
-    "source_type": "PostgreSQL",
+    "source_type": "Postgres-CDC",         
     "auth": {
       "username": "postgres",
       "password": "postgres",
       "additional_params": {
-        "base_url": "jdbc:postgresql://host.docker.internal:5432/postgres?loggerLevel=OFF"
+        "base-url": "jdbc:postgresql://host.docker.internal:5432/postgres?loggerLevel=OFF"
       }
     },
-    "tables": [
-      {
-        "name": "person",
-        "schema": {"id": "int", "name": "string"}
-      }
-    ],
     "config": {
       "host": "host.docker.internal",
+      "table-names": ["vikki_data.datalake.person"],
       "port": 5432,
-      "decoding.plugin.name": "pgoutput",
       "database-names": ["vikki_data"],
       "schema-names": ["datalake"]
     }
@@ -58,10 +52,8 @@ Open Swagger UI at http://localhost:8000/swagger
     "config": {
       "bootstrap_servers": "kafka:9092",
       "topic": "users_cdc",
-      "source_table_name": ["person"],
-      "partition": 1,
       "format": "json",
-      "schema.registry.url": "http://schema-registry:8081"
+      "schema_registry_url": "http://schema-registry:8081"
     }
   }
 }
