@@ -13,16 +13,12 @@ class SeaTunnelClient:
     ):
         # Use provided base_url or fallback to settings.API_URL
         raw_url = base_url or settings.API_URL
-        # Strip any trailing slash or path so we always append endpoints cleanly
         self.base_url = raw_url.rstrip('/').split('/submit-job')[0]
         
-        # API key fallback
         self.api_key = api_key or settings.API_KEY
         
-        # Timeout fallback
         self.timeout = timeout or settings.TIMEOUT
         
-        # Prepare session with JSON content‐type and optional auth header
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
         if self.api_key:
@@ -37,11 +33,22 @@ class SeaTunnelClient:
         # Build URL: e.g. http://host:port + /submit-job
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         try:
-            print(json.dumps(json_data, indent=4) if json_data else None)
+            job_config = json_data.get("config")
+            create_job = {
+                    "params": {
+                        "jobId": job_config.get("jobId"),
+                        "jobName": job_config.get("jobName"),
+                    },
+                    "env": job_config['config'].get("env"),
+                    "source": job_config['config'].get("source"),
+                    "transform": job_config['config'].get("transform", []),
+                    "sink": job_config['config'].get("sink"),
+                }
+
             resp = self.session.request(
                 method=method,
                 url=url,
-                json=json_data["config"]if json_data else None,
+                json=create_job,
                 timeout=self.timeout,
             )
             resp.raise_for_status()

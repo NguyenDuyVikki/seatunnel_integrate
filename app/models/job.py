@@ -2,35 +2,9 @@ from pydantic import BaseModel, Field, validator
 from typing import Dict, List, Any, Optional, Union
 from enum import Enum
 import uuid
-# "sink": [
-#       {
-#         "plugin_name": "Iceberg",
-#         "plugin_input_table": "raw_data",
-#         "catalog_name": "glue_catalog",
-#         "catalog_type": "glue",
-#         "namespace": "demo_glue_duy",
-#         "table": "seatunnel",
-#         "create_table_if_not_exists": "true",
-#         "iceberg.catalog.config": {
-#           "warehouse":      "s3://demo-seatunnel/",
-#           "catalog-impl":   "org.apache.iceberg.aws.glue.GlueCatalog",
-#           "io-impl":        "org.apache.iceberg.aws.s3.S3FileIO",
-#           "client.region":  "ap-southeast-1"
-#         }
-#       }
-      
-# "sink": [
-#     {
-#       "plugin_name": "Kafka",
-#       "source_table_name": ["users_cdc"],
-#       "bootstrap.servers": "kafka:9092",
-#       "topic": "person_cdc",
-#       "format": "json",
-#       "schema.registry.url": "http://schema-registry:8081"
-#     }
-#   ]
+
 class SourceType(str, Enum):
-    POSTGRESQLCDC = "PostgreSQL"
+    POSTGRESQLCDC = "Postgres-CDC"
     SFTP = "SFTP"
     KAFKA = "Kafka"
 
@@ -41,16 +15,25 @@ class Environment(BaseModel):
     class Config:
         populate_by_name = True
 
-class SourceConfig(BaseModel):
+class CDCEnv(BaseModel):
+    execution_parallelism: int = Field(1, alias="execution.parallelism")
+    job_mode: str = Field("STREAMING", alias="job.mode")
+    checkpoint_interval: int = Field(5000, alias="checkpoint.interval")
+    read_limit_bytes_per_second: int = Field(7000000, alias="read_limit.bytes_per_second")
+    read_limit_rows_per_second: int = Field(400, alias="read_limit.rows_per_second")
+    
+    class Config:
+        allow_population_by_field_name = True  
+
+class SeatunnelSourceConfig(BaseModel):
     plugin_name: str
-    plugin_output_table: str
-    row_num: Optional[int] = None
+    plugin_output: str
     schema_: Optional[Dict[str, Any]] = Field(None, alias="schema")
 
     class Config:
         populate_by_name = True
 
-class SftpSourceConfig(SourceConfig):
+class SftpSourceConfig(SeatunnelSourceConfig):
     host: str
     port: int = Field(ge=1, le=65535)
     username: str
@@ -58,17 +41,32 @@ class SftpSourceConfig(SourceConfig):
     file_path: str
     file_type: str
 
-class PostgreSQLSourceConfig(SourceConfig):
-    host: str
-    port: int = Field(ge=1, le=65535)
-    username: str
-    password: str
-    database_names: Dict[str, Any]
-    schema_names: Dict[str, Any]
-    table_names: Dict[str, Any]
-    base_url: str
+class PostgreSQLSourceConfig(SeatunnelSourceConfig):
+    port: Optional[int] = Field(None, ge=1, le=65535)  
+    username: Optional[str] = None
+    password: Optional[str] = None
+    database_names: Optional[List[str]] = Field(None, alias="database-names")         
+    schema_names: Optional[List[str]] = Field(None, alias="schema-names")   
+    table_names: Optional[List[str]] = Field(None, alias="table-names")       
+    base_url: Optional[str] = Field(None, alias="base-url")       
+    decoding_plugin_name: str = Field("pgoutput", alias="decoding.plugin.name")
+    class Config:
+        extra = 'allow'
 
-class SinkConfig(BaseModel):
+
+
+      
+
+class KafkaSinkConfig(BaseModel):
+    plugin_name: Optional[str] = "Kafka"
+    topic: str
+    source_table_name: List[str]
+    bootstrap_servers: str = Field("kafka:9092", alias="bootstrap.servers")  
+    partition: int
+    format: str
+    schema_registry_url: str = Field("http://schema-registry:8081", alias="schema.registry.url") 
+    
+class IcebergSinkConfig(BaseModel):
     plugin_name: str
     plugin_input_table: str
     catalog_name: Optional[str] = None
@@ -76,21 +74,6 @@ class SinkConfig(BaseModel):
     namespace: Optional[str] = None
     table: Optional[str] = None
     create_table_if_not_exists: Optional[str] = None
-
-      
-
-class KafkaSinkConfig(SinkConfig):
-    topic: str
-    source_table_name: List[str]
-    bootstrap_servers: str
-    partition: int
-    topic: str
-    format: str
-    schema_registry_url: str
-    key_serializer: Optional[str] = None
-    value_serializer: Optional[str] = None
-    
-class IcebergSinkConfig(SinkConfig):
     table: str
     create_table_if_not_exists: str
     iceberg_catalog_config: Dict[str, str] = Field(alias="iceberg.catalog.config")
@@ -99,9 +82,9 @@ class IcebergSinkConfig(SinkConfig):
         populate_by_name = True
 
 class JobConfig(BaseModel):
-    env: Environment
+    env: Optional[Union[Environment, CDCEnv]] = None
     source: List[Union[SftpSourceConfig, PostgreSQLSourceConfig]]
-    sink: List[Union[SinkConfig, IcebergSinkConfig]]
+    sink: List[Union[KafkaSinkConfig, IcebergSinkConfig]]
 
     @validator('source')
     def validate_source_types(cls, sources):
@@ -111,8 +94,8 @@ class JobConfig(BaseModel):
         return sources
 
 class Job(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
+    jobId: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    jobName: str
     config: JobConfig
     status: Optional[str] = None
 
@@ -129,7 +112,7 @@ class JobResponse(BaseModel):
     created_at: Optional[str] = None
 
 # Factory for dynamic source config creation
-def create_source_config(data: Dict[str, Any]) -> SourceConfig:
+def create_source_config(data: Dict[str, Any]) -> SeatunnelSourceConfig:
     source_type = data.get('plugin_name')
     if source_type == SourceType.SFTP.value:
         return SftpSourceConfig(**data)
@@ -138,7 +121,7 @@ def create_source_config(data: Dict[str, Any]) -> SourceConfig:
     raise ValueError(f"Unsupported source type: {source_type}")
 
 # Factory for dynamic sink config creation
-def create_sink_config(data: Dict[str, Any]) -> SinkConfig:
+def create_sink_config(data: Dict[str, Any]) -> IcebergSinkConfig:
     if 'iceberg.catalog.config' in data:
         return IcebergSinkConfig(**data)
-    return SinkConfig(**data)
+    return IcebergSinkConfig(**data)

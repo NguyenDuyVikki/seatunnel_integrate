@@ -1,148 +1,111 @@
 import uuid
-from typing import Any, Dict, List, Union
-from app.models.payload import SeaTunnelRequest, SourceConfig, AuthConfig, TableConfig
-from pydantic import Field
+from typing import Any, Dict, List, Union, Optional
+from app.models.payload import SeaTunnelRequest, SourceConfig, SinkConfig
 from app.models.job import (
     Job,        
+    CDCEnv,
     JobConfig,
-    SinkConfig,
+    SeatunnelSourceConfig,
     SftpSourceConfig,
     PostgreSQLSourceConfig,
     KafkaSinkConfig,
     IcebergSinkConfig,
-    Environment,
     SourceType
 )
+from pydantic import Field
+
 
 def map_source_item(item: SourceConfig) -> Union[SftpSourceConfig, PostgreSQLSourceConfig]:
     plugin = item.source_type
-    auth: AuthConfig  = item.auth
-    tables: List[TableConfig] = item.tables
+    auth = item.auth
     cfg = item.config
 
-    # common base
-    base = {
-        "plugin_name": plugin,
-        # assume the first table name → plugin_output_table
-        "plugin_output_table": "sample_table",
-        "schema": None,
-        "username": auth.username,
-        "password": auth.password,
-    }
+    base = SeatunnelSourceConfig(
+        plugin_name=plugin,
+        plugin_output="sample_table",  # Example plugin output
+        row_num=0,
+        schema=None,
+    )
 
     if plugin == SourceType.SFTP.value:
         return SftpSourceConfig(
-            **base,
-            host=cfg["host"],
+            **base.dict(),
+            host=cfg.get("host", "https:example.com"),
             port=cfg["port"],
             file_path=cfg["file_path"],
             file_type=cfg["file_type"],
         )
-# "source": [
-#     {
-#       "plugin_name": "Postgres-CDC",
-#       "plugin_output": "users_cdc",
-#       "username": "postgres",
-#       "password": "postgres",
-#       "decoding.plugin.name": "pgoutput",
-#       "database-names": ["vikki_data"],
-#       "schema-names": ["datalake"],
-#       "table-names": ["vikki_data.datalake.person"],
-#       "base-url": "jdbc:postgresql://host.docker.internal:5432/postgres?loggerLevel=OFF"
-#     }
-    elif plugin == SourceType.POSTGRESQLCDC.value:
-        # build maps of name→schema for each table
-        table_names = [
-            (table.name)
-            for table in tables
-        ]
-        schema_names = [
-            (table.schema or {})
-            for table in tables
-        ]
-            
 
-        pg_conf = PostgreSQLSourceConfig(
-            **base,
-            host=cfg["host"],
-            port=cfg["port"],
-            database_names=table_names,
-            schema_names=schema_names,
-            table_names=table_names,
-            base_url=auth.additional_params.get("base_url", ""),
+    elif plugin == SourceType.POSTGRESQLCDC.value:
+        return PostgreSQLSourceConfig(
+            **base.dict(),
+            port=cfg.get("port", 5432),
+            username=auth.username,
+            password=auth.password,
+            database_names=cfg.get("database-names", []),
+            schema_names=cfg.get("schema-names", []),
+            table_names=cfg.get("table-names", []),
+            base_url=auth.additional_params.get("base-url", "") if auth.additional_params else "",
         )
-        print(f"pg_conf: {pg_conf=}")
-        return pg_conf
 
     else:
         raise ValueError(f"Unsupported source_type {plugin!r}")
 
 
-def map_sink_item(item: Dict[str, Any]) -> Union[KafkaSinkConfig, IcebergSinkConfig, SinkConfig]:
-    plugin = item["sink_type"]
-    auth   = item.get("auth", {})
-    cfg    = item.get("config", {})
-
-    base = {
-        "plugin_name": plugin,
-        # if you need auth in SinkConfig, add here
-        **{},  
-    }
+def map_sink_item(item: SinkConfig, source_table_name: List[str]) -> Union[KafkaSinkConfig, IcebergSinkConfig, SinkConfig]:
+    plugin = item.sink_type
+    auth = item.auth
+    cfg = item.config
 
     if plugin == "Kafka":
         return KafkaSinkConfig(
-            **base,
-            plugin_input_table = cfg.get("plugin_input_table", ""),
-            topic              = cfg["topic"],
-            source_table_name  = cfg["source_table_name"],
-            bootstrap_servers  = cfg["bootstrap_servers"],
-            partition          = cfg["partition"],
-            data_format        = cfg["format"],                # renamed in your model
-            schema_registry_url= cfg["schema.registry.url"],  # alias will pick up
-            key_serializer     = cfg.get("key_serializer"),
-            value_serializer   = cfg.get("value_serializer"),
+            plugin_name="Kafka",  
+            topic=cfg.get("topic", None),
+            source_table_name=source_table_name,
+            bootstrap_servers=cfg.get("bootstrap_servers", None),
+            partition=cfg.get("partition", 1),
+            format=cfg.get("format", "json"),
+            schema_registry_url=cfg.get("schema_registry_url", None)
         )
+
 
     elif plugin == "Iceberg":
         return IcebergSinkConfig(
-            **base,
-            table                   = cfg["table"],
-            create_table_if_not_exists = cfg["create_table_if_not_exists"],
-            iceberg_catalog_config  = cfg["iceberg.catalog.config"],
+            plugin_name="Iceberg",  # Adding plugin_name here to match IcebergSinkConfig
+            table=cfg["table"],
+            create_table_if_not_exists=cfg.get("create_table_if_not_exists", False),
+            iceberg_catalog_config=cfg.get("iceberg.catalog.config", {}),
         )
 
-    else:
-        # fallback generic sink
-        return SinkConfig(
-            **base,
-            **cfg
-        )
+    # Fallback for other sink types
+    print(f"Unknown sink type: {plugin}")
+    return SinkConfig(plugin, **cfg)
 
 
-def parse_job(request: SeaTunnelRequest ) -> Job:
-    # 1) Environment (if any)
-    # raw_env = request["env"]
-    # if env:
-    #     env = Environment(**raw_env)
-    # else:
-    #     env = None
-    env = None
+def parse_job(request: SeaTunnelRequest) -> Job:
+    # Handle Sources (wrap single → list if necessary)
+    sources = [request.source] if isinstance(request.source, SourceConfig) else request.source
+    source_confs = [map_source_item(s) for s in sources]
+    
+    # Handle Sinks
+    sinks = [request.sink] if isinstance(request.sink, SinkConfig) else request.sink
+    sink_confs = [map_sink_item(s, [source.plugin_output for source in source_confs]) for s in sinks]
+    
+    from app.models.job import Environment
+    if request.source and request.source.source_type == "Postgres-CDC": 
+        cdc_env = CDCEnv(
+            execution_parallelism=1,
+            job_mode="STREAMING",
+            checkpoint_interval=5000,
+            read_limit_bytes_per_second=7000000,
+            read_limit_rows_per_second=400
+    )
 
-    # 2) Sources (wrap single→list if necessary)
-    srcs = getattr(request, "source", None)
-    if isinstance(srcs, SourceConfig):
-        srcs = [srcs]
-    source_confs = [map_source_item(s) for s in srcs]
-    # 3) Sinks
-    sinks = request.get("sink")
-    if isinstance(sinks, dict):
-        sinks = [sinks]
-    sink_confs = [map_sink_item(s) for s in sinks]
-
-    # 4) Build JobConfig + Job
-    job_conf = JobConfig(env=env, source=source_confs, sink=sink_confs)
+    
+    # Build JobConfig + Job
+    job_conf = JobConfig(env=cdc_env, source=source_confs, sink=sink_confs)
     return Job(
-        id=str(uuid.uuid4()),
-        name=request.get("job_name", "unnamed-job"),
+        jobId=str(uuid.uuid4()),
+        jobName=getattr(request, "job_name", "unnamed-job"),
         config=job_conf
     )

@@ -45,10 +45,7 @@ class JobService:
         
 
     def create_job(self, name: str, config: JobConfig) -> JobResponse:
-        config_dict = config.dict(by_alias=True)
-        print(config_dict)
-        job_config = {"name": name, "config": config_dict}
-        
+        job_config = {"name": name, "config": config}
         # Send the request to the SeaTunnel API
         response = self.client.create_job(job_config)
         
@@ -64,12 +61,10 @@ class JobService:
         return self.client.get_job(job_id)
 
     def get_job_status(self, job_id: str) -> str:
-        """Get the status of a job"""
         response = self.client.get_job(job_id)
         return response.get("status", "UNKNOWN")
     
     def stop_job(self, job_id: str, save_point: bool = False) -> None:
-        """Stop a running job"""
         stop_config = {
             "jobId": job_id,
             "isStopWithSavePoint": save_point
