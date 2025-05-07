@@ -57,13 +57,14 @@ async def stop_job(
 @api_router.post("/jobs")
 async def create_job(
     request: SeaTunnelRequest,
-    # job_service: JobService = Depends(get_job_service)
+    job_service: JobService = Depends(get_job_service)
 ):
 
     try:
         # result = job_service.create_job(name="api-job", config=request)
         job = parse_job(request)
         result = job.dict(by_alias=True, exclude_none=True)
+        job_service.create_job("demo",result)
         
         return result
     except Exception as e:

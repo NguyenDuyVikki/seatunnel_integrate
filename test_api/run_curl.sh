@@ -161,7 +161,6 @@ curl --location 'http://localhost:8080/submit-job' \
   ]
 }'
 
-# isStopWithSavePoint: nếu dừng kèm savepoint thì đặt true
 curl -X POST 'http://localhost:8080/stop-job' \
   -H 'Content-Type: application/json' \
   -d '{
